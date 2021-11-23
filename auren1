@@ -1,0 +1,97 @@
+## ATSI SA1 Test
+
+# 1 Set up
+
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(tidyverse,sf,utils,rgdal)
+
+
+# 2. Access ABS data
+# https:\auth.censusdata.abs.gov.au\webapi\jsf\tableView\openTable.xhtml
+
+# dowload qsa1atsi.csv to folder
+
+# Import shp file 
+# https://www.abs.gov.au/AUSSTATS/abs@.nsf/DetailsPage/1270.0.55.001July%202016?OpenDocument
+
+
+# 3. begin data preparation 
+# down load file 
+qsa1atsi<- read_csv(unz("qsa1atsi (1).zip","qsa1atsi.csv"),skip = 8)
+
+#clean up a bit 
+qsa1atsi<-qsa1atsi[-1,-8]
+qsa1atsi<-qsa1atsi[-11563:-11569,]
+qsa1atsi<-qsa1atsi %>% 
+  rename_all(list(~make.names(.))) %>% 
+  mutate(SA1=as.numeric(INGP.Indigenous.Status)) %>% 
+  select(-INGP.Indigenous.Status)
+
+# check variable type and for NAs
+head(qsa1atsi)
+summary(qsa1atsi)
+
+pqsa1atsi <- qsa1atsi %>% 
+  mutate(TATSI=Aboriginal+Torres.Strait.Islander+Both.Aboriginal.and.Torres.Strait.Islander,
+         PATSI=round((TATSI/Total*100),2)
+         ) %>% 
+  select(SA1,TATSI,Total,PATSI) %>% 
+  replace(is.na(.), 0) %>% 
+  mutate(MATSI=
+           case_when(
+             PATSI<=25 ~ "ATSI below 25 percent",
+             PATSI> 25 ~ "ATSI above 25 percent"
+           ))
+
+# check variables and for NAs
+head(pqsa1atsi)
+summary(pqsa1atsi)
+
+# 4. Import shape file
+# import sa1 https://www.abs.gov.au/AUSSTATS/abs@.nsf/DetailsPage/1270.0.55.001July%202016?OpenDocument
+
+# qldsa1 <- st_read("MB_2016_QLD.shp")
+# 
+# # check features
+# class(qldsa1)
+# 
+# 
+# # Dissolve MBs to SA1
+# qldsa1a <- qldsa1 %>% 
+#   group_by(SA1_7DIG16) %>%
+#   summarise()
+# 
+# ggplot(qldsa1a)+
+#   geom_sf()+
+#   theme_minimal()
+
+qldsa1 <- st_read("SA1_2016_AUST.shp") %>% 
+  filter(STE_CODE16==3)
+
+# check features
+class(qldsa1)
+head(qldsa1)
+
+# Join ATSI data
+atsimp <- qldsa1 %>%
+  mutate(SA1_7DIG16=as.numeric(SA1_7DIG16)) %>% 
+  select(SA1_7DIG16,geometry) %>% 
+  left_join(pqsa1atsi, by = c("SA1_7DIG16"="SA1")) %>% 
+  na.omit()
+
+summary(atsimp)
+head(atsimp)
+
+# Check out the map
+atsimp1<- ggplot(atsimp)+
+  geom_sf()+
+  geom_sf(aes(fill=factor(MATSI)))+
+  theme_minimal()+
+  labs(title= "SA1s with ATSI Population bove 25 percent of Total",
+       subtitle= "Queensland, 2016",
+       caption = "Source: ABS (2016)"
+       )
+atsimp1 
+
+ggsave("atsimp1.pdf", atsimp1, height = 5, width = 5)
