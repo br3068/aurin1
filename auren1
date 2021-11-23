@@ -51,21 +51,6 @@ summary(pqsa1atsi)
 # 4. Import shape file
 # import sa1 https://www.abs.gov.au/AUSSTATS/abs@.nsf/DetailsPage/1270.0.55.001July%202016?OpenDocument
 
-# qldsa1 <- st_read("MB_2016_QLD.shp")
-# 
-# # check features
-# class(qldsa1)
-# 
-# 
-# # Dissolve MBs to SA1
-# qldsa1a <- qldsa1 %>% 
-#   group_by(SA1_7DIG16) %>%
-#   summarise()
-# 
-# ggplot(qldsa1a)+
-#   geom_sf()+
-#   theme_minimal()
-
 qldsa1 <- st_read("SA1_2016_AUST.shp") %>% 
   filter(STE_CODE16==3)
 
