@@ -1,0 +1,129 @@
+---
+title: 'AUREN Presentation: SA1s with ATSI population greater than 30% of Total'
+author: "Ben Reid"
+date: "23/11/2021"
+output: powerpoint_presentation
+---
+
+## Steps
+### Assumes basic knowledge of R Tidyverse and SF
+- Load packages
+- Obtain the data 
+- Visualisation using simple features
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	include = FALSE
+)
+```
+
+# 1 Set up
+```{r setup2, include=TRUE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse,sf,utils,rgdal,knitr)
+```
+
+
+# 2 Access the Data
+https:\auth.censusdata.abs.gov.au\webapi\jsf\tableView\openTable.xhtml
+qsa1atsi.csv already in folder in zip file
+
+Import shapefile file 
+https://www.abs.gov.au/AUSSTATS/abs@.nsf/DetailsPage/1270.0.55.001July%202016?OpenDocument
+---
+
+# 3 Data Preparation
+qsa1atsi <- read_csv(unz("D:/OneDrive/FED19/Settler/setcolQld/qsa1atsi (1).zip","qsa1atsi.csv"),skip = 8)
+
+qsa1atsi<-qsa1atsi[-1,-8]
+qsa1atsi<-qsa1atsi[-11563:-11569,]
+
+# Data Prep 2
+qsa1atsi<-qsa1atsi %>% 
+  rename_all(list(~make.names(.))) %>% 
+  mutate(SA1=as.numeric(INGP.Indigenous.Status)) %>% 
+  select(-INGP.Indigenous.Status)
+
+```{r check, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+qsa1atsi <- read_csv(unz("D:/OneDrive/FED19/Settler/setcolQld/qsa1atsi (1).zip","qsa1atsi.csv"),skip = 8)
+qsa1atsi<-qsa1atsi[-1,-8]
+qsa1atsi<-qsa1atsi[-11563:-11569,]
+qsa1atsi<-qsa1atsi %>% 
+  rename_all(list(~make.names(.))) %>% 
+  mutate(SA1=as.numeric(INGP.Indigenous.Status)) %>% 
+  select(-INGP.Indigenous.Status)
+```
+
+# 4 Check the Data
+```{r check2, echo=TRUE}
+head(qsa1atsi)
+```
+
+```{r check3, message=FALSE, warning=FALSE, include=TRUE, paged.print=FALSE}
+summary(qsa1atsi)
+
+```
+
+# 5 Re-code data
+```{r recode, message=FALSE, warning=FALSE, include=TRUE, paged.print=TRUE}
+pqsa1atsi <- qsa1atsi %>% 
+  mutate(TATSI=Aboriginal+Torres.Strait.Islander+Both.Aboriginal.and.Torres.Strait.Islander,
+         PATSI=round((TATSI/Total*100),2)
+         ) %>% 
+  select(SA1,TATSI,Total,PATSI) %>% 
+  replace(is.na(.), 0) %>% 
+  mutate(MATSI=
+           case_when(
+             PATSI<=25 ~ "ATSI below 25 percent",
+             PATSI> 25 ~ "ATSI above 25 percent"
+           ))
+```
+
+# 6 Re-code data Check
+```{r recodecheck, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+head(pqsa1atsi)
+```
+
+
+# 7 Import shapefile
+```{r shape, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+qldsa1 <- st_read("D:/OneDrive/FED19/Settler/setcolQld/SA1_2016_AUST.shp") %>% 
+  filter(STE_CODE16==3)
+class(qldsa1)
+
+```
+# 8. Join ATSI Data
+```{r shape3, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+atsimp <- qldsa1 %>%
+  mutate(SA1_7DIG16=as.numeric(SA1_7DIG16)) %>% 
+  select(SA1_7DIG16,geometry) %>% 
+  left_join(pqsa1atsi, by = c("SA1_7DIG16"="SA1")) %>% 
+  na.omit()
+head(atsimp)
+```
+
+# 9. Visualise
+```{r shape4, echo=TRUE}
+atsimp1<- ggplot(atsimp)+
+  geom_sf()+
+  geom_sf(aes(fill=factor(MATSI)))+
+  theme_minimal()+
+  labs(title= "SA1s with ATSI Population bove 25 percent of Total",
+       subtitle= "Queensland, 2016",
+       caption = "Source: ABS (2016)"
+       )
+atsimp
+```
+
+
+
+
